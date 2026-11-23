@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,10 +9,12 @@ import { rpcClient } from './rpc-client.mjs';
 test('已打包的启动入口完成 MCP 握手、名称搜索、资源读取及错误处理', async t => {
   const dir = await mkdtemp(join(tmpdir(), 'feishu-protocol-'));
   const fixture = join(dir, 'lark-cli.mjs');
-  await mkdir(join(dir, 'codex-feishu'));
-  await writeFile(join(dir, 'codex-feishu/settings.json'), JSON.stringify({
+  const settings = JSON.stringify({
     cliPath: fixture, imProfile: 'chat-test', docsProfile: 'docs-test',
-  }));
+  });
+  const legacySettings = join(dir, 'codex-feishu/settings.json');
+  await mkdir(join(dir, 'codex-feishu'));
+  await writeFile(legacySettings, settings);
   // This executable enforces the two profiles and user identity on every request.
   await writeFile(fixture, [
     '#!/usr/bin/env node',
@@ -37,11 +39,16 @@ test('已打包的启动入口完成 MCP 握手、名称搜索、资源读取及
     '} else process.exit(2);',
     'console.log(JSON.stringify({ok:true,data}));',
   ].join('\n'), { mode: 0o700 });
-  const launch = fileURLToPath(new URL('../plugins/feishu/launch', import.meta.url));
+  const pluginRoot = new URL('../plugins/larkref/', import.meta.url);
+  const manifest = JSON.parse(await readFile(new URL('.codex-plugin/plugin.json', pluginRoot), 'utf8'));
+  const launch = fileURLToPath(new URL('launch', pluginRoot));
   const client = rpcClient(launch, [], { cwd: dir, env: { ...process.env, XDG_CONFIG_HOME: dir } });
   t.after(async () => { client.close(); await rm(dir, { recursive: true, force: true }); });
   const hello = await client.request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } });
   assert.equal(hello.protocolVersion, '2025-06-18');
+  assert.equal(manifest.interface.displayName, '飞书');
+  assert.equal(hello.serverInfo.title, manifest.interface.displayName);
+  assert.equal(hello.serverInfo.version, manifest.version);
   const tool = hello.capabilities.experimental['openai/mentions'].searchTool;
   client.notify('notifications/initialized');
   assert.deepEqual(await client.request('ping'), {});
@@ -49,9 +56,14 @@ test('已打包的启动入口完成 MCP 握手、名称搜索、资源读取及
   assert.deepEqual(discovery.tools.map(t => t.name), ['search_mentions', 'read_context']);
   assert.ok(discovery.tools.every(t => t.annotations.readOnlyHint));
   assert.ok(discovery.tools[0]._meta['openai/extensions']['mentions/search']);
+  assert.equal(discovery.tools[0]._meta.connector_name, '飞书');
   const lookup = await client.request('tools/call', { name: tool, arguments: { query: '计划', path: [] } });
   const [group, warning] = lookup.structuredContent.items;
   assert.equal(warning.uri, 'feishu://status/contact/auth');
+  // Search used the legacy settings. Resource reads should now prefer LarkRef's settings.
+  await mkdir(join(dir, 'larkref'));
+  await writeFile(join(dir, 'larkref/settings.json'), settings);
+  await writeFile(legacySettings, '{');
   const ref = await client.request('resources/read', { uri: group.uri });
   const data = JSON.parse(ref.contents[0].text);
   assert.equal(data.title, '计划');

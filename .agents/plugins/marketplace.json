@@ -1,10 +1,10 @@
 {
-  "name": "lark-chat",
-  "interface": { "displayName": "飞书上下文" },
+  "name": "larkref",
+  "interface": { "displayName": "LarkRef（飞书引用）" },
   "plugins": [
     {
-      "name": "feishu",
-      "source": { "source": "local", "path": "./plugins/feishu" },
+      "name": "larkref",
+      "source": { "source": "local", "path": "./plugins/larkref" },
       "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
       "category": "Productivity"
     }

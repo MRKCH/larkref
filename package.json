@@ -1,6 +1,7 @@
 {
-  "name": "codex-feishu-context",
-  "version": "1.0.1",
+  "name": "larkref",
+  "version": "1.0.2",
+  "description": "在 Agent 对话中引用飞书会话、联系人和文档。",
   "private": true,
   "type": "module",
   "engines": { "node": ">=20" },

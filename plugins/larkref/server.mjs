@@ -50,7 +50,7 @@ async function dispatch(method, params, signal) {
     case 'initialize':
       return {
         protocolVersion: versions.includes(params.protocolVersion) ? params.protocolVersion : versions[0],
-        serverInfo: { name: 'feishu', title: '飞书', version: '1.0.1' },
+        serverInfo: { name: 'feishu', title: '飞书', version: '1.0.2' },
         capabilities: { tools: {}, resources: {}, experimental: { 'openai/mentions': searchCapability } },
         instructions,
       };

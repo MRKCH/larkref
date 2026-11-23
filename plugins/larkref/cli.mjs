@@ -6,7 +6,6 @@ import { promisify } from 'node:util';
 
 const execute = promisify(execFile);
 const configHome = process.env.XDG_CONFIG_HOME || join(homedir(), '.config');
-const settingsPath = join(configHome, 'codex-feishu', 'settings.json');
 
 export class FeishuError extends Error {
   constructor(kind, message) {
@@ -16,17 +15,20 @@ export class FeishuError extends Error {
 }
 
 function configuration() {
-  try {
-    const value = JSON.parse(readFileSync(settingsPath, 'utf8'));
-    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error();
-    for (const key of ['imProfile', 'docsProfile', 'cliPath']) {
-      if (key in value && (typeof value[key] !== 'string' || !value[key].trim())) throw new Error();
+  for (const directory of ['larkref', 'codex-feishu']) {
+    const path = join(configHome, directory, 'settings.json');
+    try {
+      const value = JSON.parse(readFileSync(path, 'utf8'));
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error();
+      for (const key of ['imProfile', 'docsProfile', 'cliPath']) {
+        if (key in value && (typeof value[key] !== 'string' || !value[key].trim())) throw new Error();
+      }
+      return value;
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw new FeishuError('config', `请检查本机 ${directory}/settings.json 配置。`);
     }
-    return value;
-  } catch (error) {
-    if (error.code === 'ENOENT') return {};
-    throw new FeishuError('config', '请检查本机飞书插件的 settings.json 配置。');
   }
+  return {};
 }
 
 function cliError(error) {

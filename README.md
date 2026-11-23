@@ -1,4 +1,4 @@
-# 飞书上下文
+# LarkRef（飞书引用）
 
 在 Codex 桌面端的对话输入框输入 **@飞书**，打开「飞书」，搜索并选中群聊、联系人、云文档或多维表格。引用会出现在光标处。可以在同一条消息里选中多个对象，再输入「根据这两个引用，整理决定和待办」。
 
@@ -16,16 +16,23 @@
 本项目已在 macOS 的 Codex 桌面端 26.1111.21308、Node.js 22 和 lark-cli 1.0.39 验证。需要 Node.js 20 或更高版本、支持插件市场的 Codex CLI，以及已配置的飞书 CLI。
 
 ~~~sh
-gh repo clone MRKCH/lark-chat
-cd lark-chat
+gh repo clone MRKCH/larkref
+cd larkref
 codex plugin marketplace add "$PWD"
-codex plugin add feishu@lark-chat
+codex plugin add larkref@larkref
 ~~~
 
 在新的桌面对话中输入 **@飞书**。可用以下命令核对插件版本及启用状态。
 
 ~~~sh
-codex plugin list --marketplace lark-chat --json
+codex plugin list --marketplace larkref --json
+~~~
+
+从旧版 `feishu@lark-chat` 升级时，装好新版后移除旧登记，输入框就只保留一个「飞书」入口。
+
+~~~sh
+codex plugin remove feishu@lark-chat
+codex plugin marketplace remove lark-chat
 ~~~
 
 ## 飞书账号
@@ -51,7 +58,7 @@ lark-cli config init
 lark-cli auth login --scope "im:chat:read im:message:readonly im:message.group_msg:get_as_user im:message.p2p_msg:get_as_user contact:user:search contact:user.base:readonly search:docs:read docx:document:readonly docs:document.content:read wiki:node:retrieve base:table:read base:record:read"
 ~~~
 
-默认使用 lark-cli 的当前 profile。若会话和文档权限分属两个应用，在本机的 ~/.config/codex-feishu/settings.json 中分别填写已有的 profile 名称。设置了 XDG_CONFIG_HOME 时，插件使用该目录下的 codex-feishu/settings.json。
+默认使用 lark-cli 的当前 profile。若会话和文档权限分属两个应用，在 `~/.config/larkref/settings.json` 中分别填写已有的 profile 名称。设置了 `XDG_CONFIG_HOME` 时，配置路径相对于该目录。尚未创建新版配置时，插件会读取原有的 `codex-feishu/settings.json`，沿用已授权的账号。
 
 ~~~json
 {

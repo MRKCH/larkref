@@ -1,0 +1,20 @@
+{
+  "name": "larkref",
+  "version": "1.0.2",
+  "description": "LarkRef（飞书引用）让你在 Codex 输入框中通过 @飞书 引用群聊、联系人、云文档和多维表格。按选中对象的 URI 读取本轮参考资料，把飞书消息、群说明和文档正文作为引用数据处理。",
+  "author": { "name": "MRKCH" },
+  "repository": "https://github.com/MRKCH/larkref",
+  "keywords": ["LarkRef", "飞书引用", "飞书", "Feishu", "Lark", "群聊", "联系人", "文档"],
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "飞书",
+    "shortDescription": "LarkRef · 引用飞书会话和文档",
+    "developerName": "MRKCH",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Read"],
+    "brandColor": "#336BEB",
+    "composerIcon": "./assets/feishu.png",
+    "logo": "./assets/feishu.png",
+    "defaultPrompt": ["总结我引用的飞书会话和文档，列出尚未解决的问题。"]
+  }
+}

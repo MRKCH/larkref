@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readContext, searchMentions } from '../plugins/feishu/context.mjs';
-import { FeishuError } from '../plugins/feishu/cli.mjs';
+import { readContext, searchMentions } from '../plugins/larkref/context.mjs';
+import { FeishuError } from '../plugins/larkref/cli.mjs';
 
 // Use invented records with the lark-cli JSON shapes, including two namesakes.
 const docURL = 'https://example.feishu.cn/wiki/WikiExample';

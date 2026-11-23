@@ -17,12 +17,14 @@ try {
   const { thread } = await client.request('thread/start', { cwd: root, ephemeral: true, sandbox: 'read-only' });
   const threadId = thread.id;
   const inventory = await client.request('mcpServerStatus/list', { threadId, serverName: 'feishu' });
-  const server = inventory.data.find(s => s.pluginId === 'feishu@lark-chat');
-  assert.ok(server, '请先安装并启用 feishu@lark-chat');
-  assert.equal(server.serverInfo?.title, '飞书');
+  const server = inventory.data.find(s => s.pluginId === 'larkref@larkref');
+  assert.ok(server, '请先安装并启用 larkref@larkref');
+  assert.equal(server.name, 'feishu');
   const capability = server.serverCapabilities.experimental?.['openai/mentions'] ??
     server.serverCapabilities.extensions?.['openai/mentions'];
   assert.equal(capability?.searchTool, 'search_mentions');
+  const mentionTool = server.tools[capability.searchTool];
+  assert.equal(mentionTool._meta?.connector_name ?? server.serverInfo?.title, '飞书');
   const call = (tool, args) => client.request('mcpServer/tool/call', { threadId, server: server.name, tool, arguments: args });
   const search = async query => {
     const response = await call(capability.searchTool, { query });
