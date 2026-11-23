@@ -1,6 +1,6 @@
 # LarkRef（飞书引用）
 
-LarkRef 把指定的飞书群聊、联系人私聊、云文档和多维表格带进当前对话。Claude Desktop 使用本地扩展，Codex 桌面端使用输入框里的 `@飞书`。两端共用本机飞书授权。
+LarkRef 把指定的飞书群聊、联系人私聊、云文档和多维表格带进当前对话。Codex 桌面端在输入框键入 `@飞书`，Claude Desktop 的 Code 模式键入 `@飞书/关键词`，Claude 普通对话从 **+** 菜单添加引用。三种入口共用本机飞书授权。
 
 | 选中的对象 | 可用的上下文 |
 | --- | --- |
@@ -24,17 +24,28 @@ LarkRef 把指定的飞书群聊、联系人私聊、云文档和多维表格带
 
 ### Claude 的 Code 模式
 
-在本机 **Code** 会话的 **+ → Plugins** 可以查看 LarkRef 的启用状态。要按关键词查找，可直接提问，例如「用 LarkRef 查找群名包含『周会』的飞书群，先列出匹配项」。也可以在需要使用它的项目目录注册 MCP 服务。将下例中的启动器路径替换为本机实际路径。
+在 LarkRef 源码目录里运行下面的命令，将路径换成你要在 Claude 中打开的本机项目。需要 Node.js 20+、Git、Claude Code CLI 及已授权的 lark-cli。
 
 ~~~sh
-claude mcp add --transport stdio --scope local larkref -- /absolute/path/to/larkref/plugins/larkref/launch --claude-desktop
+./bin/larkref enable /path/to/your-project
 ~~~
 
-在 macOS 的 Claude Desktop 6.28899.6 上，插件已启用时，Code 新会话的 `@飞书` 匹配到了本机应用窗口。在独立注册 LarkRef 并确认连接的项目中，键入已知飞书群名也没有弹出群聊候选。桌面 Code 自行生成 `@` 文件列表，忽略终端的 `fileSuggestion` 命令。Claude Code 终端另有 `@服务器:协议://资源路径` 的 MCP 资源引用语法。[桌面 Code 的设置差异](https://code.claude.com/docs/en/desktop#claude-code-settings-that-behave-differently-in-the-code-tab) · [终端的 MCP 资源引用](https://code.claude.com/docs/en/mcp#reference-mcp-resources)
+1. 打开 Claude Desktop → **Code** → **This computer**，在新会话中选择刚启用的文件夹。单独使用的 Git worktree 也可以用自己的路径启用。
+2. 在输入框键入 **`@飞书/周会`**，把「周会」换成名称的一部分。选择例如 **项目周会（群聊）.md**，引用就会进入草稿。文件名末尾标明群聊、联系人、文档或多维表格，同类型重名时附加标识。
+3. 接着输入「总结这个群最近的决定和待办」并发送。Code 从所选文件取得 URI，通过项目 MCP 服务 `larkref-code` 读取最新的飞书内容。
 
-本地引用文件可以利用 Code 的原生文件选择器。验证时，把只含引用 URI 的样例 `飞书/群聊/海盐联想样例群.md` 加入测试仓库的 Git 索引，输入 `@海盐` 或 `@飞书/群聊/` 都能找到它。在另一个项目中对比三个同名前缀的文件，单独输入 `@关键词` 只列出了已跟踪项。
+**目标不在菜单里时**，在 Code 会话发送「用本项目的 `larkref-code` 在线搜索『周会』，按类型列出候选，等我选」。选中后可以回复「把第二项加入本项目」，也可以直接让它读取第二项。成功收录后，在同一项目再次输入 `@飞书/周会` 即可点选。除了近期列表，每个项目还保留最近从在线搜索中选定的 50 个对象。服务通过 `search_mentions` 搜索，通过 `save_reference` 收录选定项，通过 `read_context` 获取内容。
 
-对于仅保存在本机的引用，已验证的入口是 **`@飞书/关键词`**。测试项目通过 `.git/info/exclude` 排除 `/飞书/`，在 Code 窗口打开后生成 `飞书/夜航示例（群聊）.md` 和 `飞书/夜航示例（文档）.md`。输入 `@飞书/夜航` 即可看到两项，点选后引用进入草稿。LarkRef 1.1.0 尚未提供自动生成或刷新这些文件的功能。
+启用命令在本机登记项目级 MCP 服务，并创建项目下的 `飞书/` 目录。首次向飞书获取最近活跃的群聊、聊过的联系人、最近打开的文档或多维表格，每类最多 4 项，文档和多维表格共用一类。同一飞书账号组合的多个窗口或项目复用本机近期缓存。缓存过期时先显示已有快照，再刷新。项目服务运行期间每五分钟检查一次，某一类遇到网络错误时沿用该类上次成功的数据。确认撤权会清理相应候选，切换账号会重新建立项目列表。输入联想在本机完成，网络耗时发生在刷新、在线搜索及读取正文时。
+
+每个 Markdown 引用只含一行稳定的飞书 URI。群名和文档标题用于文件名，消息、联系人资料和文档正文均按选中对象实时读取。目录自带 `.gitignore`，项目内同名的既有目录或已跟踪文件会阻止接管。停用时保留用户添加或改写过的文件。账号级缓存存放在 `~/.cache/larkref/references-v1/`，设置了 `XDG_CACHE_HOME` 时随该目录变化。
+
+~~~sh
+./bin/larkref refresh /path/to/your-project
+./bin/larkref disable /path/to/your-project
+~~~
+
+也可以在会话里让 LarkRef「立即刷新本项目的飞书引用」。命令行的 `--files-only` 适用于已自行配置 MCP、只想管理目录的情况。在 macOS 的 Claude Desktop 6.28899.6 上，已验证同一关键词可同时匹配群聊和多维表格，点选群聊后引用进入草稿。桌面 Code 自行生成文件候选，LarkRef 使用其文件选择器和标准 MCP。[Claude Code 桌面端的设置差异](https://code.claude.com/docs/en/desktop#claude-code-settings-that-behave-differently-in-the-code-tab)
 
 ## Codex 桌面端
 
@@ -100,9 +111,10 @@ lark-cli auth login --scope "im:chat:read im:message:readonly im:message.group_m
 npm test
 npm run test:live
 npm run test:claude:live
+npm run test:code:live
 ~~~
 
-离线测试使用虚构数据，覆盖同名区分、授权失败、分页以及两端的协议入口。`test:live` 启动 Codex app-server 临时会话并检查已安装插件。`test:claude:live` 解包实际的 MCPB，按清单启动服务，直接调用 MCP 接口验证近期资源、补全候选和四类飞书对象的读取。两项真实验收只输出断言结果和数量。
+离线测试使用虚构数据，覆盖同名区分、授权失败、分页、跨窗口缓存、账号切换、用户文件保护及三种协议入口。`test:live` 启动 Codex app-server 临时会话并检查已安装插件。`test:claude:live` 解包实际的 MCPB，按清单启动服务，验证近期资源和补全。`test:code:live` 在临时 Git 项目中验证真实索引、收录、从引用文件读取四类对象、立即刷新和 Git 忽略，并报告首次生成和复用缓存的耗时。真实验收只输出结果、数量和耗时。
 
 真实验收默认从近期列表为四种对象各选一个样本。若近期列表缺少样本，可分别设置 FEISHU_TEST_CHAT_QUERY、FEISHU_TEST_CONTACT_QUERY、FEISHU_TEST_DOCUMENT_QUERY 和 FEISHU_TEST_BASE_QUERY。会话样本应有消息，文档应有正文，多维表格应有数据表。FEISHU_TEST_CODEX 可指定桌面端附带的 Codex 可执行文件。
 

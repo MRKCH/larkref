@@ -61,13 +61,19 @@ function displayTitle(value) {
   return String(value ?? '').replace(/<\/?hb?>/gi, '').replace(/\s+/g, ' ').trim();
 }
 
+export function directMention(q) {
+  const url = documentURL(q);
+  if (url) return documentLink(url, '引用此飞书文档', new URL(url).pathname);
+  if (chatId.test(q)) return link('feishu://chat/' + q, q, '按会话 ID 引用');
+  if (userId.test(q)) return link('feishu://contact/' + q, q, '按联系人 ID 引用');
+  return null;
+}
+
 export async function searchMentions(query = '', signal, run = runLark) {
   if (typeof query !== 'string' || query.length > 2048) throw new Error('请输入有效的飞书名称或链接。');
   const q = query.trim();
-  const direct = documentURL(q);
-  if (direct) return [documentLink(direct, '引用此飞书文档', new URL(direct).pathname)];
-  if (chatId.test(q)) return [link('feishu://chat/' + q, q, '按会话 ID 引用')];
-  if (userId.test(q)) return [link('feishu://contact/' + q, q, '按联系人 ID 引用')];
+  const direct = directMention(q);
+  if (direct) return [direct];
   const count = q ? '8' : '4';
   const size = ['--page-size', count];
   const chars = Array.from(q);
@@ -195,7 +201,7 @@ async function documentContext(source, cursor, run, signal) {
   const end = Math.min(offset + documentPage, characters.length);
   const hasMore = end < characters.length;
   return {
-    format: 'docx', url: source, title: wiki?.title, document_id: doc.document_id, revision: doc.revision_id,
+    format: 'docx', url: source, title: wiki?.title || doc.title, document_id: doc.document_id, revision: doc.revision_id,
     content: characters.slice(offset, end).join(''), offset, has_more: hasMore,
     ...(hasMore ? { next_cursor: String(doc.revision_id) + ':' + end } : {}),
   };

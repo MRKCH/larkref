@@ -1,0 +1,66 @@
+#!/usr/bin/env node
+import { execFile } from 'node:child_process';
+import { lstat, realpath } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+import { disableProject, syncProject } from '../plugins/larkref/project-index.mjs';
+
+const exec = promisify(execFile);
+const launcher = fileURLToPath(new URL('../plugins/larkref/launch', import.meta.url));
+const name = 'larkref-code';
+const usage = '用法：larkref enable|refresh|disable [项目目录] [--files-only]\n' +
+  'enable 生成引用并接入本项目的 Claude Code。refresh 立即刷新。disable 移除本机接入。\n' +
+  '--files-only 跳过 Claude CLI 登记，只管理引用文件。';
+
+async function claude(root, args) {
+  try {
+    return (await exec('claude', ['mcp', ...args], { cwd: root, timeout: 30_000 })).stdout;
+  } catch (error) {
+    if (error.code === 'ENOENT') throw new Error('未找到 claude 命令。可安装 Claude Code CLI，或用 --files-only 管理引用文件。');
+    if (args[0] === 'get' && /No MCP server found with name/i.test([error.stderr, error.stdout].join(' '))) return null;
+    throw new Error('Claude MCP 登记失败，请运行 claude mcp get ' + name + ' 检查本项目配置。');
+  }
+}
+
+async function installed(root) {
+  const detail = await claude(root, ['get', name]);
+  if (detail === null) return false;
+  const lines = detail.split('\n').map(line => line.trim());
+  if (!lines.some(l => l.startsWith('Scope: Local config')) || !lines.includes('Command: ' + launcher) ||
+      !lines.includes('Args: --claude-code ' + root)) {
+    throw new Error('此项目中已有其他同名 MCP 服务 larkref-code，请核对现有登记。');
+  }
+  return true;
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  if (!args.length || args.includes('--help') || args.includes('-h')) { console.log(usage); return; }
+  const filesOnly = args.includes('--files-only');
+  const [action, path = '.', ...extra] = args.filter(arg => arg !== '--files-only');
+  if (!['enable','refresh','disable'].includes(action) || path.startsWith('--') || extra.length) throw new Error(usage);
+  const root = await realpath(resolve(path));
+  process.chdir(root);
+  if (action === 'disable') {
+    if (!filesOnly && await installed(root)) await claude(root, ['remove', '--scope', 'local', name]);
+    const marker = join(root, '飞书', '.larkref-index.json');
+    const exists = await lstat(marker).catch(error => { if (error.code !== 'ENOENT') throw error; });
+    const result = exists ? await disableProject(root) : { preserved: 0 };
+    console.log('已停用本项目的飞书引用。' + (result.preserved ? ' 已保留用户添加或修改的文件。' : ''));
+    return;
+  }
+  const add = action === 'enable' && !filesOnly && !await installed(root);
+  const result = await syncProject(root, { enable: action === 'enable', force: action === 'refresh' });
+  if (add) {
+    try { await claude(root, ['add', '--scope', 'local', '--transport', 'stdio', name, '--', launcher, '--claude-code', root]); }
+    catch (error) { if (!await installed(root)) throw error; }
+  }
+  console.log('飞书引用目录：' + join(root, '飞书') + '（' + result.total + ' 项）。在 Claude Code 输入 @飞书/ 选择。');
+  for (const [kind, reason] of Object.entries(result.errors)) {
+    console.log(({ chat: '群聊', contact: '联系人', document: '文档' })[kind] +
+      (reason === 'service' ? '暂时无法刷新，沿用上次成功的列表。' : '暂时不可用，请检查授权和访问权限。'));
+  }
+}
+
+main().catch(error => { console.error(error.message); process.exitCode = 1; });

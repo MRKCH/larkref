@@ -6,7 +6,8 @@ from zipfile import ZIP_DEFLATED, ZipFile
 root = Path(__file__).resolve().parents[1]
 source = root / "plugins" / "larkref"
 dest = root / "dist" / "larkref.mcpb"
-files = ("manifest.json", "server.mjs", "claude-picker.mjs", "context.mjs",
+files = ("manifest.json", "server.mjs", "claude-picker.mjs", "code-picker.mjs",
+         "project-index.mjs", "index-files.mjs", "index-storage.mjs", "context.mjs",
          "base.mjs", "cli.mjs", "assets/feishu.png")
 
 dest.parent.mkdir(exist_ok=True)

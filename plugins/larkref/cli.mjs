@@ -59,7 +59,31 @@ export async function runLark(domain, args, signal) {
   const profile = domain === 'docs' ? settings.docsProfile : settings.imProfile;
   // +table-list always emits JSON and has no --format flag in lark-cli 1.0.39.
   const format = args[0] === 'base' && args[1] === '+table-list' ? [] : ['--format', 'json'];
-  const argv = [...(profile ? ['--profile', profile] : []), ...args, '--as', 'user', ...format];
+  return invoke(settings, profile, [...args, '--as', 'user', ...format], signal);
+}
+
+// auth status reads local identity metadata. Only app-scoped user IDs enter the cache key.
+export async function indexAccounts(signal) {
+  const settings = configuration();
+  const profiles = [settings.imProfile, settings.docsProfile];
+  const identities = new Map();
+  await Promise.all([...new Set(profiles)].map(async profile => {
+    let status;
+    try {
+      status = await invoke(settings, profile, ['auth', 'status'], signal);
+    } catch (error) {
+      if (error.kind !== 'auth') throw error;
+    }
+    const user = status?.identities?.user;
+    const id = user?.openId || status?.userOpenId;
+    const ready = status?.appId && id && user?.available !== false;
+    identities.set(profile, ready ? [status.brand || '', status.appId, id] : null);
+  }));
+  return profiles.map(profile => identities.get(profile));
+}
+
+async function invoke(settings, profile, args, signal) {
+  const argv = [...(profile ? ['--profile', profile] : []), ...args];
   let stdout;
   try {
     ({ stdout } = await execute(settings.cliPath || 'lark-cli', argv, {
