@@ -3,4 +3,4 @@ set -eu
 PATH="${PATH:-/usr/bin:/bin}:/opt/homebrew/bin:/usr/local/bin:${HOME}/.npm-global/bin"
 export PATH
 cd "$(dirname "$0")"
-exec node server.mjs
+exec node server.mjs "$@"

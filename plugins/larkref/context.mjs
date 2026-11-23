@@ -201,30 +201,39 @@ async function documentContext(source, cursor, run, signal) {
   };
 }
 
-export async function readContext(uri, cursor = '', signal, run = runLark) {
-  if (typeof uri !== 'string' || uri.length > 2048 || typeof cursor !== 'string' || cursor.length > 4096) {
-    throw new Error('无效的飞书引用或分页参数。');
-  }
+export function parseReference(uri) {
+  if (typeof uri !== 'string' || uri.length > 2048) throw new Error('无效的飞书引用。');
   // The desktop composer serializes a selected resource as a Markdown link.
   const wrapped = /^mcp-resource:\/\/feishu\/([^/?#]+)$/.exec(uri);
   if (wrapped) uri = decodeURIComponent(wrapped[1]);
   const match = /^feishu:\/\/(chat|contact|document|status)\/([^#\s]+)$/u.exec(uri);
   if (!match) throw new Error('无法识别此飞书引用。');
   const [, kind, id] = match;
-  let result;
   if (kind === 'document') {
     const url = documentURL('https://' + id);
     if (!url || url.slice(8) !== id) throw new Error('无效的飞书文档链接。');
-    result = await documentContext(url, cursor, run, signal);
   } else if (kind === 'status') {
     const parts = id.split('/');
     const [source, reason] = parts;
     if (parts.length !== 2 || !Object.hasOwn(labels, source) || !Object.hasOwn(diagnostics, reason)) {
       throw new Error('无效的状态引用。');
     }
+  } else if (!(kind === 'chat' ? chatId : userId).test(id)) {
+    throw new Error('无效的飞书对象 ID。');
+  }
+  return { uri, kind, id };
+}
+
+export async function readContext(reference, cursor = '', signal, run = runLark) {
+  if (typeof cursor !== 'string' || cursor.length > 4096) throw new Error('无效的飞书引用或分页参数。');
+  const { uri, kind, id } = parseReference(reference);
+  let result;
+  if (kind === 'document') {
+    result = await documentContext('https://' + id, cursor, run, signal);
+  } else if (kind === 'status') {
+    const [source, reason] = id.split('/');
     result = { source: labels[source], status: diagnostics[reason], hint: '检查本机插件配置及飞书用户授权，然后重新搜索。' };
   } else {
-    if (!(kind === 'chat' ? chatId : userId).test(id)) throw new Error('无效的飞书对象 ID。');
     result = await conversation(kind, id, cursor, run, signal);
   }
   return { source_uri: uri, kind, ...result };

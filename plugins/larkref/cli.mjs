@@ -1,11 +1,15 @@
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 const execute = promisify(execFile);
 const configHome = process.env.XDG_CONFIG_HOME || join(homedir(), '.config');
+// Desktop apps may launch without the PATH initialized by the user's shell.
+const executableSearchPath = [process.env.PATH, dirname(process.execPath), ...(process.platform === 'darwin' ?
+  ['/opt/homebrew/bin', '/usr/local/bin', join(homedir(), '.npm-global/bin'), join(homedir(), '.local/bin')] : [])]
+  .filter(Boolean).join(delimiter);
 
 export class FeishuError extends Error {
   constructor(kind, message) {
@@ -60,6 +64,7 @@ export async function runLark(domain, args, signal) {
   try {
     ({ stdout } = await execute(settings.cliPath || 'lark-cli', argv, {
       signal,
+      env: { ...process.env, PATH: executableSearchPath },
       timeout: 20_000,
       maxBuffer: 8 * 1024 * 1024,
       windowsHide: true,
