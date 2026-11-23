@@ -32,7 +32,9 @@ claude mcp add --transport stdio --scope local larkref -- /absolute/path/to/lark
 
 在 macOS 的 Claude Desktop 6.28899.6 上，插件已启用时，Code 新会话的 `@飞书` 匹配到了本机应用窗口。在独立注册 LarkRef 并确认连接的项目中，键入已知飞书群名也没有弹出群聊候选。桌面 Code 自行生成 `@` 文件列表，忽略终端的 `fileSuggestion` 命令。Claude Code 终端另有 `@服务器:协议://资源路径` 的 MCP 资源引用语法。[桌面 Code 的设置差异](https://code.claude.com/docs/en/desktop#claude-code-settings-that-behave-differently-in-the-code-tab) · [终端的 MCP 资源引用](https://code.claude.com/docs/en/mcp#reference-mcp-resources)
 
-本地引用文件可以利用 Code 的原生文件选择器。用虚构群聊验证时，在项目中放入只含引用 URI 的 `飞书/群聊/海盐联想样例群.md`，输入 `@海盐` 或 `@飞书/群聊/` 都能找到该文件，点选后进入草稿。LarkRef 1.1.0 尚未提供自动生成此类索引的功能。
+本地引用文件可以利用 Code 的原生文件选择器。验证时，把只含引用 URI 的样例 `飞书/群聊/海盐联想样例群.md` 加入测试仓库的 Git 索引，输入 `@海盐` 或 `@飞书/群聊/` 都能找到它。在另一个项目中对比三个同名前缀的文件，单独输入 `@关键词` 只列出了已跟踪项。
+
+对于仅保存在本机的引用，已验证的入口是 **`@飞书/关键词`**。测试项目通过 `.git/info/exclude` 排除 `/飞书/`，在 Code 窗口打开后生成 `飞书/夜航示例（群聊）.md` 和 `飞书/夜航示例（文档）.md`。输入 `@飞书/夜航` 即可看到两项，点选后引用进入草稿。LarkRef 1.1.0 尚未提供自动生成或刷新这些文件的功能。
 
 ## Codex 桌面端
 
