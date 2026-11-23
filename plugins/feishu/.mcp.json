@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "feishu": {
+      "command": "./launch",
+      "cwd": "."
+    }
+  }
+}

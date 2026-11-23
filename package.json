@@ -1,0 +1,11 @@
+{
+  "name": "codex-feishu-context",
+  "version": "1.0.1",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "test:live": "node test/live.mjs"
+  }
+}
