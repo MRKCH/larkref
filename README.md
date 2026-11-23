@@ -24,11 +24,15 @@ LarkRef 把指定的飞书群聊、联系人私聊、云文档和多维表格带
 
 ### Claude 的 Code 模式
 
-在使用本机环境的 Code 会话里，也可以从需要使用 LarkRef 的项目目录注册 MCP 服务。下例适用于 macOS，将启动器路径替换为 LarkRef 在本机的实际位置。打开该项目的新 Code 会话后即可按上面的方式提问。[Claude Code 桌面端文档](https://code.claude.com/docs/en/desktop)
+在本机 **Code** 会话的 **+ → Plugins** 可以查看 LarkRef 的启用状态。要按关键词查找，可直接提问，例如「用 LarkRef 查找群名包含『周会』的飞书群，先列出匹配项」。也可以在需要使用它的项目目录注册 MCP 服务。将下例中的启动器路径替换为本机实际路径。
 
 ~~~sh
 claude mcp add --transport stdio --scope local larkref -- /absolute/path/to/larkref/plugins/larkref/launch --claude-desktop
 ~~~
+
+在 macOS 的 Claude Desktop 6.28899.6 上，插件已启用时，Code 新会话的 `@飞书` 匹配到了本机应用窗口。在独立注册 LarkRef 并确认连接的项目中，键入已知飞书群名也没有弹出群聊候选。桌面 Code 自行生成 `@` 文件列表，忽略终端的 `fileSuggestion` 命令。Claude Code 终端另有 `@服务器:协议://资源路径` 的 MCP 资源引用语法。[桌面 Code 的设置差异](https://code.claude.com/docs/en/desktop#claude-code-settings-that-behave-differently-in-the-code-tab) · [终端的 MCP 资源引用](https://code.claude.com/docs/en/mcp#reference-mcp-resources)
+
+本地引用文件可以利用 Code 的原生文件选择器。用虚构群聊验证时，在项目中放入只含引用 URI 的 `飞书/群聊/海盐联想样例群.md`，输入 `@海盐` 或 `@飞书/群聊/` 都能找到该文件，点选后进入草稿。LarkRef 1.1.0 尚未提供自动生成此类索引的功能。
 
 ## Codex 桌面端
 
