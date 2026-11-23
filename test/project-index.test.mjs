@@ -32,7 +32,7 @@ async function fixture(t) {
   const sync = options => syncProject(root, options, sources);
   const refs = async () => {
     const folder = join(root, '飞书');
-    const names = (await readdir(folder)).filter(n => n.endsWith('.md'));
+    const names = (await readdir(folder)).filter(n => !n.startsWith('.'));
     return new Map(await Promise.all(names.map(async n => [n.normalize('NFC'), await readFile(join(folder, n), 'utf8')])));
   };
   return { dir, root, folder: join(root, '飞书'), data, sync, sources, refs };
@@ -49,17 +49,17 @@ test('并发启用共享近期快照，引用仅含 URI，刷新不改写未变�
   assert.equal(one.total, 6);
   assert.equal(two.total, 6);
   const names = await f.refs();
-  assert.equal(names.get('发布（群聊）.md'), 'feishu://chat/oc_a\n');
-  assert.equal(names.get('发布（群聊·oc_b）.md'), 'feishu://chat/oc_b\n');
-  assert.equal(names.get('计划（多维表格）.md'), 'feishu://document/example.feishu.cn/wiki/abc\n');
-  assert.ok([...names.keys()].every(name => Buffer.byteLength(name) <= 255 && !name.startsWith('.')));
+  assert.equal(names.get('发布（群聊）'), 'feishu://chat/oc_a\n');
+  assert.equal(names.get('发布（群聊·oc_b）'), 'feishu://chat/oc_b\n');
+  assert.equal(names.get('计划（多维表格）'), 'feishu://document/example.feishu.cn/wiki/abc\n');
+  assert.ok([...names.keys()].every(name => Buffer.byteLength(name) <= 255 && name.endsWith('）')));
   assert.equal(execFileSync('git', ['-C',f.root,'status','--porcelain','--untracked-files=all']).toString(), '');
-  const path = join(f.folder, '发布（群聊）.md');
+  const path = join(f.folder, '发布（群聊）');
   const before = await stat(path);
   f.data.rows.reverse();
   await f.sync({ force: true });
   assert.equal((await stat(path)).mtimeMs, before.mtimeMs);
-  const duplicate = join(f.folder, '发布（群聊·oc_b）.md');
+  const duplicate = join(f.folder, '发布（群聊·oc_b）');
   const duplicateTime = (await stat(duplicate)).mtimeMs;
   f.data.rows = f.data.rows.filter(entry => entry.uri !== 'feishu://chat/oc_a');
   await f.sync({ force: true });
@@ -98,9 +98,9 @@ test('拒绝接管现有目录及跟踪文件，保留被用户编辑的引用�
   await assert.rejects(f.sync({ enable: true }), /占用/);
   await rm(f.folder);
   await f.sync({ enable: true });
-  const edited = join(f.folder,'发布（群聊）.md');
+  const edited = join(f.folder,'发布（群聊）');
   await writeFile(edited,'用户的批注');
-  await symlink(join(f.root,'原目录','私有.md'),join(f.folder,'同名（群聊）.md'));
+  await symlink(join(f.root,'原目录','私有.md'),join(f.folder,'同名（群聊）'));
   f.data.rows.push(item('chat/oc_link','同名'));
   await f.sync({ force: true });
   assert.equal(await readFile(edited,'utf8'),'用户的批注');
@@ -109,19 +109,65 @@ test('拒绝接管现有目录及跟踪文件，保留被用户编辑的引用�
   assert.equal(await readFile(edited,'utf8'),'用户的批注');
 });
 
+test('旧项目去掉 .md 后缀，保留重名对象的对应关系、已选对象和用户文件', async t => {
+  const f = await fixture(t);
+  f.data.rows.push(item('chat/oc_b', '发布'));
+  await f.sync({ enable: true });
+  await f.sync({ selected: item('chat/oc_saved', '版本 v1.2') });
+  const marker = join(f.folder, '.larkref-index.json');
+  const current = JSON.parse(await readFile(marker, 'utf8'));
+  const legacy = {
+    '发布（群聊）.md': 'feishu://chat/oc_b',
+    '发布（群聊·oc_a）.md': 'feishu://chat/oc_a',
+    '清禾（联系人）.md': initial[1].uri,
+    '计划（多维表格）.md': initial[2].uri,
+    '版本 v1.2（群聊）.md': 'feishu://chat/oc_saved',
+  };
+  for (const name of Object.keys(current.files)) await rm(join(f.folder, name));
+  for (const [name, uri] of Object.entries(legacy)) await writeFile(join(f.folder, name), uri + '\n');
+  await writeFile(marker, JSON.stringify({ ...current, version: 1, files: legacy }));
+  await writeFile(join(f.folder, '计划（多维表格）.md'), '手写批注');
+  // This unrelated file already occupies the new name, even with identical bytes.
+  await writeFile(join(f.folder, '清禾（联系人）'), initial[1].uri + '\n');
+
+  assert.ok((await f.sync({})).cached);
+  const upgraded = JSON.parse(await readFile(marker, 'utf8'));
+  assert.equal(upgraded.version, 2);
+  assert.deepEqual(upgraded.saved, current.saved);
+  assert.deepEqual(upgraded.files, {
+    '发布（群聊）': 'feishu://chat/oc_b',
+    '发布（群聊·oc_a）': 'feishu://chat/oc_a',
+    '清禾（联系人·ou_a）': initial[1].uri,
+    '计划（多维表格）': initial[2].uri,
+    '版本 v1.2（群聊）': 'feishu://chat/oc_saved',
+  });
+  for (const [name, uri] of Object.entries(upgraded.files)) {
+    assert.equal(await readFile(join(f.folder, name), 'utf8'), uri + '\n');
+  }
+  assert.deepEqual((await readdir(f.folder)).filter(n => n.endsWith('.md')), ['计划（多维表格）.md']);
+  await f.sync({});
+  assert.deepEqual(JSON.parse(await readFile(marker, 'utf8')), upgraded);
+  assert.equal((await disableProject(f.root)).preserved, 2);
+  assert.equal(await readFile(join(f.folder, '计划（多维表格）.md'), 'utf8'), '手写批注');
+  assert.equal(await readFile(join(f.folder, '清禾（联系人）'), 'utf8'), initial[1].uri + '\n');
+});
+
 test('已中断的索引发布可以重试，已退出进程的锁不会阻塞新窗口', async t => {
   const f = await fixture(t);
   await f.sync({ enable: true });
   const marker = join(f.folder,'.larkref-index.json');
   const journal = JSON.parse(await readFile(marker,'utf8'));
   journal.files['旧名（群聊）.md'] = 'feishu://chat/oc_old';
+  journal.files['发布（群聊）.md'] = initial[0].uri;
   await writeFile(marker,JSON.stringify(journal));
   await writeFile(join(f.folder,'旧名（群聊）.md'),'feishu://chat/oc_old\n');
-  await rm(join(f.folder,'发布（群聊）.md'));
+  await writeFile(join(f.folder,'发布（群聊）.md'), initial[0].uri + '\n');
+  await rm(join(f.folder,'清禾（联系人）'));
   const dead = join(cacheDirectory(), 'locks','2147483646-dead');
   await mkdir(dead);
   await f.sync({});
   assert.deepEqual(new Set((await f.refs()).values()),new Set(initial.map(e=>e.uri+'\n')));
+  assert.deepEqual((await readdir(f.folder)).filter(n => n.endsWith('.md')), []);
   await assert.rejects(stat(dead),{code:'ENOENT'});
   await assert.rejects(withIndexLock(() => { throw new Error('模拟中断'); }),/模拟中断/);
   assert.equal(await withIndexLock(() => 1),1);
@@ -140,15 +186,15 @@ test('新项目可先使用过期快照，然后按最新结果更新目录', as
   const sources = {
     ...f.sources,
     recent: async () => {
-      const stub = await readFile(join(second, '飞书', '发布（群聊）.md'), 'utf8');
+      const stub = await readFile(join(second, '飞书', '发布（群聊）'), 'utf8');
       assert.equal(stub, initial[0].uri + '\n');
       return [item('chat/oc_new', '新群')];
     },
   };
   const result = await syncProject(second, { enable: true }, sources);
   assert.equal(result.total, 1);
-  assert.equal(await readFile(join(second, '飞书', '新群（群聊）.md'), 'utf8'), 'feishu://chat/oc_new\n');
-  await assert.rejects(stat(join(second, '飞书', '发布（群聊）.md')), { code: 'ENOENT' });
+  assert.equal(await readFile(join(second, '飞书', '新群（群聊）'), 'utf8'), 'feishu://chat/oc_new\n');
+  await assert.rejects(stat(join(second, '飞书', '发布（群聊）')), { code: 'ENOENT' });
 });
 
 test('项目保留最近确认的 50 个不同对象，重复选择会更新顺序', async t => {
@@ -161,5 +207,5 @@ test('项目保留最近确认的 50 个不同对象，重复选择会更新顺�
   assert.equal(result.saved, 50);
   const refs = await f.refs();
   assert.equal(refs.size, 50 + initial.length);
-  assert.ok(refs.has('群0（群聊）.md') && refs.has('群50（群聊）.md') && !refs.has('群1（群聊）.md'));
+  assert.ok(refs.has('群0（群聊）') && refs.has('群50（群聊）') && !refs.has('群1（群聊）'));
 });

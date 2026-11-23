@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "larkref",
   "display_name": "LarkRef（飞书引用）",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "在 Claude 中选择飞书群聊、联系人、云文档和多维表格，读取为本轮参考资料。",
   "author": { "name": "MRKCH" },
   "repository": { "type": "git", "url": "https://github.com/MRKCH/larkref" },

@@ -17,7 +17,8 @@ let client;
 
 async function catalog() {
   const result = new Map();
-  for (const name of (await readdir(folder)).filter(n => n.endsWith('.md'))) {
+  for (const name of (await readdir(folder)).filter(n => !n.startsWith('.'))) {
+    assert.ok(name.endsWith('）'), '引用应以对象类型标记结尾');
     const text = await readFile(join(folder, name), 'utf8');
     assert.ok(/^feishu:\/\/(chat|contact|document)\/[^\s]+\n$/.test(text), '每个引用文件只能含一个 URI');
     execFileSync('git', ['-C', root, 'check-ignore', '--quiet', '--', join('飞书', name)]);

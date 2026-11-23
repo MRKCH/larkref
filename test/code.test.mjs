@@ -35,7 +35,8 @@ test('Code 项目启用、多进程复用缓存、只收录选定候选、按 UR
   const listCalls = async () => (await readFile(calls, 'utf8')).split('\n').filter(c => c === 'im +chat-list').length;
   const folder = join(root, '飞书');
   async function references(path = folder) {
-    const names = (await readdir(path)).filter(n => n.endsWith('.md'));
+    const names = (await readdir(path)).filter(n => !n.startsWith('.'));
+    assert.ok(names.every(name => name.endsWith('）')));
     return Promise.all(names.map(n => readFile(join(path, n), 'utf8')));
   }
   await Promise.all([manage('enable', root), manage('enable', other)]);
@@ -52,7 +53,7 @@ test('Code 项目启用、多进程复用缓存、只收录选定候选、按 UR
     client = rpcClient(launch, ['--claude-code', root], { cwd: other, env });
     const hello = await client.request('initialize', { protocolVersion: '2025-11-25' });
     client.notify('notifications/initialized');
-    assert.match(hello.instructions, /飞书\/\*\.md/);
+    assert.match(hello.instructions, /飞书\/.*无后缀引用文件/);
   }
   await start();
   const tool = (name, args) => client.request('tools/call', { name, arguments: args });

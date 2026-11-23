@@ -14,7 +14,7 @@ const claudeDesktop = Boolean(code) || process.argv.includes('--claude-desktop')
 const pickerInstructions = claudeDesktop ?
   'search_mentions 可按名称查找飞书对象。遇到同名候选时，请用户指定对象后再读取。' :
   '用户在输入框选中的 feishu:// URI 标识本轮引用。桌面端的 mcp-resource://feishu/ 链接也可以直接交给 read_context。';
-const instructions = pickerInstructions + (code ? '用户选择的 飞书/*.md 文件只包含一条稳定 URI。' +
+const instructions = pickerInstructions + (code ? '飞书/ 目录下选中的无后缀引用文件只包含一条稳定 URI。' +
   '请读取该文件，把 URI 交给本项目的 read_context。在线搜索时，先按类型列出候选、说明同名区别，等待用户选定。' +
   '只需收录时用 save_reference，读取已搜索并选定的对象也会将该引用收录进本项目。' : '') +
   '使用 resources/read 或 read_context 读取对应对象。' +
@@ -75,7 +75,7 @@ async function dispatch(method, params, signal) {
     case 'initialize':
       return {
         protocolVersion: versions.includes(params.protocolVersion) ? params.protocolVersion : versions[0],
-        serverInfo: { name: claudeDesktop ? 'larkref' : 'feishu', title: claudeDesktop ? 'LarkRef（飞书引用）' : '飞书', version: '1.2.0' },
+        serverInfo: { name: claudeDesktop ? 'larkref' : 'feishu', title: claudeDesktop ? 'LarkRef（飞书引用）' : '飞书', version: '1.2.1' },
         capabilities: { tools: {}, resources: {}, ...(claudeDesktop ? { prompts: {}, completions: {} } :
           { experimental: { 'openai/mentions': searchCapability } }) },
         instructions,

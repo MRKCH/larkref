@@ -9,6 +9,8 @@ import { writeJson } from './index-storage.mjs';
 
 const exec = promisify(execFile);
 const marker = '.larkref-index.json';
+const manifestVersion = 2;
+const referenceEnding = /（(?:群聊|联系人|文档|多维表格)(?:·[A-Za-z0-9_-]{1,64})?）$/u;
 const ignore = '*\n';
 const labels = { chat: '群聊', contact: '联系人', document: '文档' };
 const folded = name => name.normalize('NFC').toLowerCase();
@@ -56,10 +58,12 @@ async function checkTracked(root) {
 }
 
 function validateManifest(state) {
-  if (state?.version !== 1 || !state.files || Array.isArray(state.files) || typeof state.files !== 'object' ||
+  if (![1, manifestVersion].includes(state?.version) || !state.files || Array.isArray(state.files) || typeof state.files !== 'object' ||
       !Array.isArray(state.saved) || !(state.account === null || /^[a-f0-9]{64}$/.test(state.account))) throw new Error();
   for (const [name, uri] of Object.entries(state.files)) {
-    if (basename(name) !== name || /[\\/\0]/.test(name) || !name.endsWith('.md') || name.startsWith('.')) throw new Error();
+    // A v2 migration journal can temporarily own both names for a reference.
+    const validEnding = name.endsWith('.md') || (state.version === manifestVersion && referenceEnding.test(name));
+    if (!validEnding || basename(name) !== name || /[\\/\0]/.test(name) || name.startsWith('.')) throw new Error();
     if (parseReference(uri).kind === 'status') throw new Error();
   }
   for (const entry of state.saved) {
@@ -80,7 +84,7 @@ export async function workspace(rootPath, enable = false) {
     const stage = await mkdtemp(join(root, '.larkref-init-'));
     try {
       await writeFile(join(stage, '.gitignore'), ignore, { mode: 0o600 });
-      await writeJson(join(stage, marker), { version: 1, account: null, files: {}, saved: [] });
+      await writeJson(join(stage, marker), { version: manifestVersion, account: null, files: {}, saved: [] });
       await rename(stage, dir);
     } finally { await rm(stage, { recursive: true, force: true }); }
   }
@@ -98,12 +102,12 @@ export async function workspace(rootPath, enable = false) {
 
 function* possibleNames(entry) {
   const prefix = stem(entry.title) + '（' + entry.type;
-  yield prefix + '）.md';
+  yield prefix + '）';
   const id = parseReference(entry.uri).id.split('?')[0].split('/').at(-1);
-  yield prefix + '·' + id.slice(-8) + '）.md';
+  yield prefix + '·' + id.slice(-8) + '）';
   const hash = createHash('sha256').update(entry.uri).digest('hex');
   for (let length = 8; length <= hash.length; length += 4) {
-    yield prefix + '·' + hash.slice(0, length) + '）.md';
+    yield prefix + '·' + hash.slice(0, length) + '）';
   }
 }
 
@@ -137,6 +141,13 @@ export async function render(folder, account, recent, saved) {
     reserved.set(folded(name), owned ? uri : false);
     if (owned) present.set(folded(name), name.normalize('NFC'));
   }
+  // Keep each legacy item's disambiguation, even if the source now returns its
+  // namesakes in another order. An existing extensionless path takes precedence.
+  for (const [key, name] of present) {
+    if (!name.endsWith('.md')) continue;
+    const target = folded(name.slice(0, -3));
+    if (!reserved.has(target)) reserved.set(target, reserved.get(key));
+  }
   const entries = new Map([...recent, ...saved].map(e => [e.uri, e]));
   const files = {};
   // Existing owners get first choice even if two search results change order.
@@ -146,7 +157,7 @@ export async function render(folder, account, recent, saved) {
     files[name] = uri;
     reserved.set(folded(name), uri);
   }
-  const next = { version: 1, account, files, saved };
+  const next = { version: manifestVersion, account, files, saved };
   const changed = JSON.stringify(state) !== JSON.stringify(next);
   // Journal additions before publishing. After a crash the next run can reclaim
   // any complete file that was created or retired partway through this update.

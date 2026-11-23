@@ -1,6 +1,6 @@
 {
   "name": "larkref",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "在 Agent 对话中引用飞书会话、联系人和文档。",
   "private": true,
   "type": "module",
